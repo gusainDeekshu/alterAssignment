@@ -17,6 +17,12 @@ app.use(express.urlencoded({ extended: true }));
 //establishin db conex=ctions
 connectMongodb("mongodb://127.0.0.1:27017/alterAssignment");
 app.use("/auth",userrouter);
+// app.use("/",(req,res)=>{
+//     return res.json({
+//         success: true,
+//         message: "Api Working successfully",
+//       });
+// });
 app.use("/api",userrouter);
 
 

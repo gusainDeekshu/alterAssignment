@@ -1,24 +1,25 @@
-import { googleLogout } from '@react-oauth/google';
-import { useState } from 'react';
+import { googleLogout } from "@react-oauth/google";
+import { useState } from "react";
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
 function Mainpage() {
-const token = localStorage.getItem('google_token');
+  const token = localStorage.getItem("google_token");
 
-const [longUrl, setLongUrl] = useState("");
+  const [longUrl, setLongUrl] = useState("");
   const [customAlias, setCustomAlias] = useState("");
   const [topic, setTopic] = useState("");
   const [shortUrl, setShortUrl] = useState("");
   const [error, setError] = useState("");
-
+  const url = import.meta.env.VITE_SERVER_URL;
+  console.log(url);
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setShortUrl("");
 
     try {
-      const response = await fetch("http://localhost:3001/api/shorten", {
+      const response = await fetch(`${url}/api/shorten`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -26,7 +27,7 @@ const [longUrl, setLongUrl] = useState("");
         },
         body: JSON.stringify({ longUrl, customAlias, topic }),
       });
-    
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to shorten URL");
@@ -36,27 +37,23 @@ const [longUrl, setLongUrl] = useState("");
       if (!response.ok) throw new Error(data.message || "Something went wrong");
 
       setShortUrl(data.data.shortUrl);
-    console.log(data.data.shortUrl);
+      console.log(data.data.createdAt);
     } catch (err) {
       setError(err.message);
     }
   };
 
+  const navigate = useNavigate();
 
-
-
-
-    const navigate = useNavigate();
-  
   function handleLogout() {
-    googleLogout()
-    localStorage.removeItem('google_token');
-    navigate('/');
-}
+    googleLogout();
+    localStorage.removeItem("google_token");
+    navigate("/");
+  }
   return (
     <div>
-       <button onClick={handleLogout}>Logout</button>
-       <div
+      <button onClick={handleLogout}>Logout</button>
+      <div
         style={{
           maxWidth: "400px",
           margin: "20px auto",
@@ -95,7 +92,6 @@ const [longUrl, setLongUrl] = useState("");
             <option value="acquisition">Acquisition</option>
             <option value="activation">Activation</option>
             <option value="retention">Retention</option>
-           
           </select>
           <button
             type="submit"
@@ -121,7 +117,7 @@ const [longUrl, setLongUrl] = useState("");
         {error && <p style={{ marginTop: "10px", color: "red" }}>{error}</p>}
       </div>
     </div>
-  )
+  );
 }
 
-export default Mainpage
+export default Mainpage;

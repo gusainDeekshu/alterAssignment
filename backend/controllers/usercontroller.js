@@ -3,10 +3,29 @@ const axios = require("axios");
 const User = require("../modals/users");
 const URL = require("../modals/url");
 const shortid = require("shortid");
-//add article
-require("dotenv").config();
-// login user
+const redisClient = require("../client");
 
+require("dotenv").config();
+
+// Max requests allowed and duration (in seconds)
+const MAX_REQUESTS = process.env.MAX_REQUESTS || 10;
+const TIME_WINDOW = process.env.TIME_WINDOW || 60; // 60 seconds (1 minute)
+
+// Function to check rate limit using Redis
+const isRateLimited = async (ip) => {
+  const key = `rate_limit:${ip}`; // Unique key for each IP
+
+  // Increment the request count in Redis
+  const currentCount = await redisClient.incr(key);
+
+  if (currentCount === 1) {
+    // If it's the first request, set the expiration time (time window)
+    await redisClient.expire(key, TIME_WINDOW);
+  }
+
+  // If the request count exceeds the max allowed requests, return true
+  return currentCount > MAX_REQUESTS;
+};
 
 const loginuser = async (req, res) => {
 // console.log(process.env.JWT_SECRET);
@@ -67,8 +86,21 @@ const createtoken = (id) => {
 };
 const createShortUrl = async (req, res) => {
   try {
+
+    const ip = req.user; // Use the IP address for rate limiting
+
+    // Check rate limit
+    const rateLimited = await isRateLimited(ip);
+    if (rateLimited) {
+      return res.status(429).json({
+        success: false,
+        message: "Rate limit exceeded. Try again later."
+      });
+    }
     console.log("Received Body:", req.body);
     const { longUrl, customAlias, topic } = req.body;
+
+    
 
     // Validate input
     if (!longUrl) {
