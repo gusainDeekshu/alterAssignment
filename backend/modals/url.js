@@ -11,7 +11,7 @@ const urlSchema = new mongoose.Schema(
     }, // Categorization
     analytics: {
       clicks: { type: Number, default: 0 },
-      lastAccessed: { type: Date },
+      lastAccessed: [{ type: Date }],
       userAgents: { type: Map, of: Number, default: {} },
       osType: [
         {

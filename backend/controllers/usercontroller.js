@@ -5,7 +5,6 @@ const URL = require("../modals/url");
 const shortid = require("shortid");
 const redisClient = require("../client");
 const useragent = require("useragent");
-const geoip = require("geoip-lite");
 
 require("dotenv").config();
 
@@ -31,7 +30,6 @@ const isRateLimited = async (ip) => {
 
 const loginuser = async (req, res) => {
   // console.log(process.env.JWT_SECRET);
-
   try {
     const { code } = req.body;
 
@@ -131,9 +129,15 @@ const createShortUrl = async (req, res) => {
     });
 
     await newUrl.save();
-    // Cache the short URL and its long URL mapping in Redis
-    await redisClient.setex(`shorturl:${shortUrl}`, 3600, longUrl); // Cache for 1 hour (3600 seconds)
 
+    // Cache the new short URL
+    await redisClient.setex(`shorturl:${shortUrl}`, 3600, longUrl);
+
+    // Invalidate analytics cache to reflect new URL
+    await redisClient.del(`analytics:all`);
+    if (topic) {
+      await redisClient.del(`analytics:topic:${topic}`);
+    }
     return res.status(201).json({
       success: true,
       message: "URL shortened successfully",
@@ -156,13 +160,7 @@ const redirectShortUrl = async (req, res) => {
     const osName = agent.os.toString().split(" ")[0] || "Unknown OS";
     const deviceType = /mobile/i.test(userAgentString) ? "mobile" : "desktop";
 
-    // Lookup geolocation
-    let geo = geoip.lookup(ip);
-    if (!geo) {
-      geo = { country: "Unknown", city: "Unknown" };
-    }
-    const location = geo.country || "Unknown";
-
+    
     const urlRecord = await URL.findOne({ shortUrl: alias });
 
     if (!urlRecord) {
@@ -173,7 +171,7 @@ const redirectShortUrl = async (req, res) => {
 
     // Increment Click Count
     urlRecord.analytics.clicks += 1;
-    urlRecord.analytics.lastAccessed = new Date();
+    urlRecord.analytics.lastAccessed.push(new Date());
 
     // Track OS Type
     if (!urlRecord.analytics.osType) {
@@ -247,7 +245,11 @@ const redirectShortUrl = async (req, res) => {
 
     // Save the Updated Record
     await urlRecord.save();
-
+ await redisClient.del(`analytics:${alias}`);
+    await redisClient.del(`analytics:all`);
+    if (urlRecord.topic) {
+      await redisClient.del(`analytics:topic:${urlRecord.topic}`);
+    }
     return res.redirect(urlRecord.originalUrl);
   } catch (error) {
     console.error("Error redirecting short URL:", error);
@@ -255,4 +257,265 @@ const redirectShortUrl = async (req, res) => {
   }
 };
 
-module.exports = { loginuser, createShortUrl, redirectShortUrl };
+const getanalyticsByAlias = async (req, res) => {
+  const { alias } = req.params;
+
+  try {
+    // Check if data is cached in Redis
+    const cachedData = await redisClient.get(`analytics:${alias}`);
+    if (cachedData) {
+        return res.json(JSON.parse(cachedData));
+    }
+
+    // Fetch analytics from database
+    const analyticsData = await URL.findOne({ shortUrl: alias });
+    if (!analyticsData) {
+      return res
+        .status(404)
+        .json({ message: "No analytics found for this alias" });
+    }
+
+    // Process analytics data
+    const totalClicks = analyticsData.analytics.clicks;
+    const uniqueUsers = new Set(
+      analyticsData.analytics.osType.flatMap((os) => os.uniqueUsers)
+    ).size;
+
+    const recentDates = [...Array(7)].map((_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      return date.toISOString().split("T")[0]; // Format as YYYY-MM-DD
+    });
+
+    // Count occurrences of each date
+    const dateCounts = analyticsData.analytics.lastAccessed.reduce(
+      (acc, date) => {
+        const dateStr = new Date(date).toISOString().split("T")[0]; // Convert to YYYY-MM-DD
+        acc[dateStr] = (acc[dateStr] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    // Map to the required output format
+    const clicksByDate = recentDates.map((date) => ({
+      date,
+      clickCount: dateCounts[date] || 0, // Default to 0 if no clicks
+    }));
+
+    const osType = analyticsData.analytics.osType.map((os) => ({
+      osName: os.osName,
+      uniqueClicks: os.uniqueClicks,
+      uniqueUsers: os.uniqueUsers.length,
+    }));
+
+    const deviceType = analyticsData.analytics.deviceType.map((device) => ({
+      deviceName: device.deviceName,
+      uniqueClicks: device.uniqueClicks,
+      uniqueUsers: device.uniqueUsers.length,
+    }));
+
+    const response = {
+      totalClicks,
+      uniqueUsers,
+      clicksByDate,
+      osType,
+      deviceType,
+    };
+
+    // Cache response in Redis
+    await redisClient.setex(
+      `analytics:${alias}`,
+      3600,
+      JSON.stringify(response)
+    );
+
+    return res.json(response);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server Error" });
+  }
+};
+
+const getanalyticsByTopic = async (req, res) => {
+  const { topic } = req.params;
+  try {
+    // Check if data is cached in Redis
+    const cachedData = await redisClient.get(`analytics:topic:${topic}`);
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
+
+    // Fetch all URLs under the specified topic
+    const urls = await URL.find({ topic });
+    if (!urls.length) {
+      return res.status(404).json({ message: "No URLs found for this topic" });
+    }
+
+    let totalClicks = 0;
+    const uniqueUsersSet = new Set();
+
+    const urlData = urls.map((url) => {
+      totalClicks += url.analytics.clicks;
+
+      url.analytics.osType.forEach((os) =>
+        os.uniqueUsers.forEach((user) => uniqueUsersSet.add(user))
+      );
+
+      return {
+        shortUrl: url.shortUrl,
+        totalClicks: url.analytics.clicks,
+        uniqueUsers: new Set(
+          url.analytics.osType.flatMap((os) => os.uniqueUsers)
+        ).size,
+      };
+    });
+
+    const uniqueUsers = uniqueUsersSet.size;
+
+    // Get last 7 days' dates
+    const recentDates = [...Array(7)].map((_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      return date.toISOString().split("T")[0];
+    });
+
+    // Count clicks by date using lastAccessed timestamps
+    const clicksByDate = recentDates.map((date) => {
+      const clickCount = urls.reduce((sum, url) => {
+        const dateCounts = url.analytics.lastAccessed.reduce(
+          (acc, accessedDate) => {
+            const formattedDate = new Date(accessedDate)
+              .toISOString()
+              .split("T")[0];
+            acc[formattedDate] = (acc[formattedDate] || 0) + 1;
+            return acc;
+          },
+          {}
+        );
+
+        return sum + (dateCounts[date] || 0);
+      }, 0);
+
+      return { date, clickCount };
+    });
+
+    const response = { totalClicks, uniqueUsers, clicksByDate, urls: urlData };
+
+    // Cache response in Redis for 1 hour
+    await redisClient.setex(
+      `analytics:topic:${topic}`,
+      3600,
+      JSON.stringify(response)
+    );
+
+    return res.json(response);
+  } catch (error) {
+    console.error("Error fetching analytics:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getAllAnalytics = async (req, res) => {
+  try {
+      // Check if data is cached in Redis
+      const cachedData = await redisClient.get(`analytics:all`);
+      if (cachedData) {
+          return res.json(JSON.parse(cachedData));
+      }
+
+      // Fetch all URLs from the database
+      const urls = await URL.find();
+      if (!urls.length) {
+          return res.status(404).json({ message: "No URLs found" });
+      }
+
+      let totalClicks = 0;
+      let totalUniqueUsers = new Set();
+      let osTypeData = {};
+      let deviceTypeData = {};
+      let accessDates = [];
+
+      urls.forEach(url => {
+          totalClicks += url.analytics.clicks;
+          accessDates = accessDates.concat(url.analytics.lastAccessed);
+
+          // Process OS Type Analytics
+          url.analytics.osType.forEach(os => {
+              if (!osTypeData[os.osName]) {
+                  osTypeData[os.osName] = { uniqueClicks: 0, uniqueUsers: new Set() };
+              }
+              osTypeData[os.osName].uniqueClicks += os.uniqueClicks;
+              os.uniqueUsers.forEach(user => {
+                  totalUniqueUsers.add(user);
+                  osTypeData[os.osName].uniqueUsers.add(user);
+              });
+          });
+
+          // Process Device Type Analytics
+          url.analytics.deviceType.forEach(device => {
+              if (!deviceTypeData[device.deviceName]) {
+                  deviceTypeData[device.deviceName] = { uniqueClicks: 0, uniqueUsers: new Set() };
+              }
+              deviceTypeData[device.deviceName].uniqueClicks += device.uniqueClicks;
+              device.uniqueUsers.forEach(user => {
+                  deviceTypeData[device.deviceName].uniqueUsers.add(user);
+              });
+          });
+      });
+
+      // Compute Clicks by Date (Last 7 Days)
+      const recentDates = [...Array(7)].map((_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          return date.toISOString().split("T")[0];
+      });
+
+      const clicksByDate = recentDates.map(date => {
+          const count = accessDates.filter(accessDate =>
+              new Date(accessDate).toISOString().split("T")[0] === date
+          ).length;
+          return { date, clickCount: count };
+      });
+
+      // Convert osTypeData and deviceTypeData to arrays
+      const osType = Object.entries(osTypeData).map(([osName, data]) => ({
+          osName,
+          uniqueClicks: data.uniqueClicks,
+          uniqueUsers: data.uniqueUsers.size,
+      }));
+
+      const deviceType = Object.entries(deviceTypeData).map(([deviceName, data]) => ({
+          deviceName,
+          uniqueClicks: data.uniqueClicks,
+          uniqueUsers: data.uniqueUsers.size,
+      }));
+
+      // Response Object
+      const response = {
+          totalUrls: urls.length,
+          totalClicks,
+          uniqueUsers: totalUniqueUsers.size,
+          clicksByDate,
+          osType,
+          deviceType,
+      };
+
+      // Cache the response in Redis for 1 hour (3600 seconds)
+      await redisClient.setex(`analytics:all`, 3600, JSON.stringify(response));
+
+      return res.json(response);
+  } catch (error) {
+      console.error("Error fetching analytics:", error);
+      return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports = {
+  loginuser,
+  createShortUrl,
+  redirectShortUrl,
+  getanalyticsByAlias,
+  getanalyticsByTopic,
+  getAllAnalytics
+};
