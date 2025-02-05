@@ -10,10 +10,23 @@ const urlSchema = new mongoose.Schema(
       required: true 
     }, // Categorization
     analytics: {
-      clicks: { type: Number, default: 0 }, // Total clicks
-      lastAccessed: { type: Date }, // Last time it was clicked
-      referrers: { type: Map, of: Number, default: {} }, // Store referrer domains & counts
-      userAgents: { type: Map, of: Number, default: {} }, // Track browser types
+      clicks: { type: Number, default: 0 },
+      lastAccessed: { type: Date },
+      userAgents: { type: Map, of: Number, default: {} },
+      osType: [
+        {
+          osName: { type: String, required: true },
+          uniqueClicks: { type: Number, default: 0 },
+          uniqueUsers: { type: [String], default: [] }, // Ensure array of strings
+        },
+      ],
+      deviceType: [
+        {
+          deviceName: String,
+          uniqueClicks: Number,
+          uniqueUsers: { type: Array, default: [] },
+        },
+      ],
     },
     createdAt: { type: Date, default: Date.now },
   },

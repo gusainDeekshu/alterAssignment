@@ -109,7 +109,7 @@ function Mainpage() {
         {shortUrl && (
           <p style={{ marginTop: "10px", color: "green" }}>
             Short URL:{" "}
-            <a href={shortUrl} target="_blank" rel="noopener noreferrer">
+            <a href={`${url}/api/shorten/${shortUrl}`} target="_blank" rel="noopener noreferrer">
               {shortUrl}
             </a>
           </p>
