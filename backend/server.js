@@ -18,19 +18,13 @@ app.use(express.urlencoded({ extended: true }));
 //establishin db conex=ctions
 connectMongodb(process.env.MONGO_URI);
 app.use("/auth",userrouter);
-
 app.use("/check",(req,res)=>{
     return res.json({
         success: true,
         message: "Api Working successfully",
       });
 });
-// app.use("/",(req,res)=>{
-//     return res.json({
-//         success: true,
-//         message: "Api Working successfully",
-//       });
-// });
+
 app.use("/api",userrouter);
 
 
