@@ -63,7 +63,8 @@ const swaggerOptions = {
     info: {
       title: "Short URL API",
       version: "1.0.0",
-      description: "API documentation for the URL tracking application",
+      description: "API documentation for the URL tracking application  <br> <span style='color: red; font-weight: bold;'>Note:</span> For token, add <code>/login/google</code> after the URL.",
+
     },
     components: {
       securitySchemes: {
