@@ -1,7 +1,7 @@
 
 # Advance Url Shortner
 
-URL Shortener & Analytics for LinkedIn
+URL Shortener & Analytics 
 
 Overview
 
@@ -14,8 +14,6 @@ URL Shortening: Convert long URLs into short, trackable links.
 Analytics Tracking: Monitor click counts, user engagement, and traffic sources.
 
 Google Login Integration: Secure authentication for managing shortened links.
-
-Dashboard: View analytics and manage URLs through an intuitive interface.
 
 Custom Aliases: Users can create custom short URLs for branding purposes.
 
@@ -33,26 +31,30 @@ Installation
 
 Clone the repository:
 
-git clone https://github.com/your-repo/url-shortener.git
-cd url-shortener
+git clone https://github.com/gusainDeekshu/alterAssignment.git
+cd alterAssignment
 
 Install dependencies:
 
 npm install
 
-Set up environment variables by creating a .env file in the root directory and adding:
-
-PORT=3000
-MONGO_URI=your_mongodb_connection_string
+PORT=3001
+MONGO_URI="mongodb://127.0.0.1:27017/alterAssignment"
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-SESSION_SECRET=your_session_secret
+JWT_SECRET=your_session_secret (choose any secure value)
+GOOGLE_REDIRECT_URI=http://localhost:3001/auth/google/callback  # Ensure this matches the Authorized Redirect URI in your Google Client settings
+REDIS_URL=redis://yoururl:port  # Leave empty if running Redis locally or via Docker
+MAX_REQUESTS=10
+TIME_WINDOW=60
 
 Start the server:
 
-npm start
+npm run server
 
-Open http://localhost:3000 in your browser.
+Open http://localhost:3001/check in your browser to verify that the API is running.
+Open http://localhost:3001/api-docs to view all Swagger API documentation.
+Open http://localhost:3001/login/google to generate a token and access Swagger responses related to Google authentication.
 
 Challenges Faced & Solutions
 
@@ -60,7 +62,7 @@ Challenges Faced & Solutions
 
 Challenge: Ensuring secure OAuth 2.0 authentication.
 
-Solution: Used Passport.js with Google Strategy and session management for user authentication.
+Solution: Used jwt with Google Strategy and session management for user authentication.
 
 2. Tracking Clicks Efficiently
 
@@ -72,13 +74,19 @@ Solution: Stored click data in MongoDB and optimized queries for performance.
 
 Challenge: Avoiding URL conflicts and ensuring unique short links.
 
-Solution: Used a base62 encoding system with a collision-resistant approach.
+Solution: Used a shortid encoding system with a collision-resistant approach.
 
-4. Handling LinkedIn URL Previews
+4. Handling  URL Previews
 
-Challenge: LinkedIn’s link preview mechanism prefetches URLs, affecting click analytics.
+Challenge:  link preview mechanism prefetches URLs, affecting click analytics.
 
-Solution: Identified and filtered out LinkedIn bot traffic using User-Agent detection.
+Solution: Identified and filtered out traffic using User-Agent detection.
+
+5. Deployment on AWS
+
+Challenges Faced: Successfully deployed using ECR, ECS, and Load Balancing, but it cost $2 per day.
+
+Solution:Due to high costs, switched to Render for a more cost-effective solution.
 
 Future Improvements
 
@@ -90,10 +98,4 @@ Implement a browser extension for easy URL shortening.
 
 
 
-License
-
-This project is licensed under the MIT License.
-## License
-
-[MIT](https://choosealicense.com/licenses/mit/)
 
