@@ -85,7 +85,7 @@ Challenge:  link preview mechanism prefetches URLs, affecting click analytics.
 
 Solution: Identified and filtered out traffic using User-Agent detection.
 
-5. Deployment on AWS
+5. Deployment of docker image on AWS
 
 Challenges Faced: Successfully deployed using ECR, ECS, and Load Balancing, but it cost $2 per day.
 
