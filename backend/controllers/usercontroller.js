@@ -11,7 +11,8 @@ require("dotenv").config();
 // Max requests allowed and duration (in seconds)
 const MAX_REQUESTS = process.env.MAX_REQUESTS || 10;
 const TIME_WINDOW = process.env.TIME_WINDOW || 60; // 60 seconds (1 minute)
-
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 // Function to check rate limit using Redis
 const isRateLimited = async (ip) => {
   const key = `rate_limit:${ip}`; // Unique key for each IP
@@ -28,16 +29,24 @@ const isRateLimited = async (ip) => {
   return currentCount > MAX_REQUESTS;
 };
 
+const redirectToGoogleAuth = (req, res) => {
+  const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&response_type=code&scope=email profile`;
+  res.redirect(authUrl);
+};
+
+
 const loginuser = async (req, res) => {
   // console.log(process.env.JWT_SECRET);
   try {
-    const { code } = req.body;
-
+    const code = req.query.code;
+    if (!code) {
+        return res.status(400).json({ error: 'Authorization code not found' });
+    }
     // Exchange code for access token
     const { data } = await axios.post("https://oauth2.googleapis.com/token", {
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: "postmessage",
+      redirect_uri:  process.env.GOOGLE_REDIRECT_URI,
       grant_type: "authorization_code",
       code,
     });
@@ -88,7 +97,7 @@ const createtoken = (id) => {
 const createShortUrl = async (req, res) => {
   try {
     const ip = req.user; // Use the IP address for rate limiting
-
+    const allowedTopics = ["acquisition", "activation", "retention"];
     // Check rate limit
     const rateLimited = await isRateLimited(ip);
     if (rateLimited) {
@@ -99,7 +108,12 @@ const createShortUrl = async (req, res) => {
     }
     // console.log("Received Body:", req.body);
     const { longUrl, customAlias, topic } = req.body;
-
+    if (!allowedTopics.includes(topic)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid topic. Allowed values: ${allowedTopics.join(", ")}`,
+      });
+    }
     // Validate input
     if (!longUrl) {
       return res
@@ -116,7 +130,11 @@ const createShortUrl = async (req, res) => {
           .json({ success: false, message: "Custom alias already in use" });
       }
     }
-
+    if (!topic) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Topic is required" });
+    }
     // Generate a short URL (customAlias or random)
     const shortUrl = customAlias || shortid.generate();
 
@@ -160,7 +178,6 @@ const redirectShortUrl = async (req, res) => {
     const osName = agent.os.toString().split(" ")[0] || "Unknown OS";
     const deviceType = /mobile/i.test(userAgentString) ? "mobile" : "desktop";
 
-    
     const urlRecord = await URL.findOne({ shortUrl: alias });
 
     if (!urlRecord) {
@@ -245,12 +262,23 @@ const redirectShortUrl = async (req, res) => {
 
     // Save the Updated Record
     await urlRecord.save();
- await redisClient.del(`analytics:${alias}`);
+    await redisClient.del(`analytics:${alias}`);
     await redisClient.del(`analytics:all`);
     if (urlRecord.topic) {
       await redisClient.del(`analytics:topic:${urlRecord.topic}`);
     }
-    return res.redirect(urlRecord.originalUrl);
+    
+     // Detect if the request is from Swagger UI (check Accept header)
+     if (req.headers['accept']?.includes('application/json')) {
+      return res.json({ redirectUrl: urlRecord.originalUrl });
+    }
+
+    console.log(req.headers['accept'])
+    console.log(req.headers['accept'])
+    console.log(req.headers['accept'])
+    console.log(req.headers['accept'])
+    console.log(req.headers['accept'])
+    return res.redirect(302, urlRecord.originalUrl);
   } catch (error) {
     console.error("Error redirecting short URL:", error);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -264,7 +292,7 @@ const getanalyticsByAlias = async (req, res) => {
     // Check if data is cached in Redis
     const cachedData = await redisClient.get(`analytics:${alias}`);
     if (cachedData) {
-        return res.json(JSON.parse(cachedData));
+      return res.json(JSON.parse(cachedData));
     }
 
     // Fetch analytics from database
@@ -412,103 +440,115 @@ const getanalyticsByTopic = async (req, res) => {
     return res.json(response);
   } catch (error) {
     console.error("Error fetching analytics:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "internal server error" });
   }
 };
 
 const getAllAnalytics = async (req, res) => {
   try {
-      // Check if data is cached in Redis
-      const cachedData = await redisClient.get(`analytics:all`);
-      if (cachedData) {
-          return res.json(JSON.parse(cachedData));
-      }
+    // Check if data is cached in Redis
+    const cachedData = await redisClient.get(`analytics:all`);
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
 
-      // Fetch all URLs from the database
-      const urls = await URL.find();
-      if (!urls.length) {
-          return res.status(404).json({ message: "No URLs found" });
-      }
+    // Fetch all URLs from the database
+    const urls = await URL.find();
+    if (!urls.length) {
+      return res.status(404).json({ message: "No URLs found" });
+    }
 
-      let totalClicks = 0;
-      let totalUniqueUsers = new Set();
-      let osTypeData = {};
-      let deviceTypeData = {};
-      let accessDates = [];
+    let totalClicks = 0;
+    let totalUniqueUsers = new Set();
+    let osTypeData = {};
+    let deviceTypeData = {};
+    let accessDates = [];
 
-      urls.forEach(url => {
-          totalClicks += url.analytics.clicks;
-          accessDates = accessDates.concat(url.analytics.lastAccessed);
+    urls.forEach((url) => {
+      totalClicks += url.analytics.clicks;
+      accessDates = accessDates.concat(url.analytics.lastAccessed);
 
-          // Process OS Type Analytics
-          url.analytics.osType.forEach(os => {
-              if (!osTypeData[os.osName]) {
-                  osTypeData[os.osName] = { uniqueClicks: 0, uniqueUsers: new Set() };
-              }
-              osTypeData[os.osName].uniqueClicks += os.uniqueClicks;
-              os.uniqueUsers.forEach(user => {
-                  totalUniqueUsers.add(user);
-                  osTypeData[os.osName].uniqueUsers.add(user);
-              });
-          });
-
-          // Process Device Type Analytics
-          url.analytics.deviceType.forEach(device => {
-              if (!deviceTypeData[device.deviceName]) {
-                  deviceTypeData[device.deviceName] = { uniqueClicks: 0, uniqueUsers: new Set() };
-              }
-              deviceTypeData[device.deviceName].uniqueClicks += device.uniqueClicks;
-              device.uniqueUsers.forEach(user => {
-                  deviceTypeData[device.deviceName].uniqueUsers.add(user);
-              });
-          });
+      // Process OS Type Analytics
+      url.analytics.osType.forEach((os) => {
+        if (!osTypeData[os.osName]) {
+          osTypeData[os.osName] = { uniqueClicks: 0, uniqueUsers: new Set() };
+        }
+        osTypeData[os.osName].uniqueClicks += os.uniqueClicks;
+        os.uniqueUsers.forEach((user) => {
+          totalUniqueUsers.add(user);
+          osTypeData[os.osName].uniqueUsers.add(user);
+        });
       });
 
-      // Compute Clicks by Date (Last 7 Days)
-      const recentDates = [...Array(7)].map((_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          return date.toISOString().split("T")[0];
+      // Process Device Type Analytics
+      url.analytics.deviceType.forEach((device) => {
+        if (!deviceTypeData[device.deviceName]) {
+          deviceTypeData[device.deviceName] = {
+            uniqueClicks: 0,
+            uniqueUsers: new Set(),
+          };
+        }
+        deviceTypeData[device.deviceName].uniqueClicks += device.uniqueClicks;
+        device.uniqueUsers.forEach((user) => {
+          deviceTypeData[device.deviceName].uniqueUsers.add(user);
+        });
       });
+    });
 
-      const clicksByDate = recentDates.map(date => {
-          const count = accessDates.filter(accessDate =>
-              new Date(accessDate).toISOString().split("T")[0] === date
-          ).length;
-          return { date, clickCount: count };
-      });
+    // Compute Clicks by Date (Last 7 Days)
+    const recentDates = [...Array(7)].map((_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      return date.toISOString().split("T")[0];
+    });
 
-      // Convert osTypeData and deviceTypeData to arrays
-      const osType = Object.entries(osTypeData).map(([osName, data]) => ({
-          osName,
-          uniqueClicks: data.uniqueClicks,
-          uniqueUsers: data.uniqueUsers.size,
-      }));
+    const clicksByDate = recentDates.map((date) => {
+      const count = accessDates.filter(
+        (accessDate) =>
+          new Date(accessDate).toISOString().split("T")[0] === date
+      ).length;
+      return { date, clickCount: count };
+    });
 
-      const deviceType = Object.entries(deviceTypeData).map(([deviceName, data]) => ({
-          deviceName,
-          uniqueClicks: data.uniqueClicks,
-          uniqueUsers: data.uniqueUsers.size,
-      }));
+    // Convert osTypeData and deviceTypeData to arrays
+    const osType = Object.entries(osTypeData).map(([osName, data]) => ({
+      osName,
+      uniqueClicks: data.uniqueClicks,
+      uniqueUsers: data.uniqueUsers.size,
+    }));
 
-      // Response Object
-      const response = {
-          totalUrls: urls.length,
-          totalClicks,
-          uniqueUsers: totalUniqueUsers.size,
-          clicksByDate,
-          osType,
-          deviceType,
-      };
+    const deviceType = Object.entries(deviceTypeData).map(
+      ([deviceName, data]) => ({
+        deviceName,
+        uniqueClicks: data.uniqueClicks,
+        uniqueUsers: data.uniqueUsers.size,
+      })
+    );
 
-      // Cache the response in Redis for 1 hour (3600 seconds)
-      await redisClient.setex(`analytics:all`, 3600, JSON.stringify(response));
+    // Response Object
+    const response = {
+      totalUrls: urls.length,
+      totalClicks,
+      uniqueUsers: totalUniqueUsers.size,
+      clicksByDate,
+      osType,
+      deviceType,
+    };
 
-      return res.json(response);
+    // Cache the response in Redis for 1 hour (3600 seconds)
+    await redisClient.setex(`analytics:all`, 3600, JSON.stringify(response));
+
+    return res.json(response);
   } catch (error) {
-      console.error("Error fetching analytics:", error);
-      return res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching analytics:", error);
+    return res.status(500).json({ message: "internal server error" });
   }
+};
+
+
+const logoutUser = (req, res) => {
+  res.clearCookie('auth_token', { httpOnly: true, secure: true, sameSite: 'None' });
+   return res.json({ message: 'Logged out successfully' });
 };
 
 module.exports = {
@@ -517,5 +557,6 @@ module.exports = {
   redirectShortUrl,
   getanalyticsByAlias,
   getanalyticsByTopic,
-  getAllAnalytics
+  getAllAnalytics,redirectToGoogleAuth,
+  logoutUser
 };
