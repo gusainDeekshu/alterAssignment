@@ -447,8 +447,15 @@ const getanalyticsByTopic = async (req, res) => {
 const getAllAnalytics = async (req, res) => {
   try {
     // Check if data is cached in Redis
+    console.log("Redis Client:", redisClient);
+    if (!redisClient) {
+        throw new Error("Redis client is not initialized.");
+    }
+    // const cachedData = await redisClient.get(`analytics:all`);
+
     const cachedData = await redisClient.get(`analytics:all`);
     if (cachedData) {
+      console.log(cachedData);
       return res.json(JSON.parse(cachedData));
     }
 
