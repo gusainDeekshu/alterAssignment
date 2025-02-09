@@ -1,0 +1,21 @@
+
+# Google Client Id
+GOOGLE_CLIENT_ID=
+# Google Client Secret
+GOOGLE_CLIENT_SECRET=
+
+JWT_SECRET=
+# max request user can send for given time framme
+MAX_REQUESTS=10
+# refresh time for user request
+TIME_WINDOW=60 
+# MONGO_URI="mongodb://127.0.0.1:27017/alterAssignment"
+MONGO_URI=
+
+GOOGLE_REDIRECT_URI=http://localhost:3001/auth/google/callback
+
+#PORT
+PORT=3001
+# REDIS_URL= 
+REDIS_URL=
+
