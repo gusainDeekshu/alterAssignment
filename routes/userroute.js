@@ -1,11 +1,18 @@
-const {Router}=require('express')
-const {loginuser, createShortUrl, redirectShortUrl, getanalyticsByAlias, getanalyticsByTopic, getAllAnalytics } = require('../controllers/usercontroller');
+const { Router } = require("express");
+const {
+  loginuser,
+  createShortUrl,
+  redirectShortUrl,
+  getanalyticsByAlias,
+  getanalyticsByTopic,
+  getAllAnalytics,
+} = require("../controllers/usercontroller");
 
-const { authMiddleware } = require('../middlewares/auth');
+const { authMiddleware } = require("../middlewares/auth");
 
-const router=Router();
+const router = Router();
 
-router.get("/google/callback",loginuser);
+router.get("/google/callback", loginuser);
 
 /**
  * @swagger
@@ -79,6 +86,32 @@ router.get("/google/callback",loginuser);
  *                 message:
  *                   type: string
  *                   example: "Long URL is required"
+ *       401:
+ *         description: Unauthorized. The user is not authenticated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Not Authorized. Please log in again."
+ *       403:
+ *         description: Forbidden. Token not provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Token not provided."
  *       429:
  *         description: Rate limit exceeded.
  *         content:
@@ -93,7 +126,7 @@ router.get("/google/callback",loginuser);
  *                   type: string
  *                   example: "Rate limit exceeded. Try again later."
  *       500:
- *         description: Server error.
+ *         description: Internal Server Error.
  *         content:
  *           application/json:
  *             schema:
@@ -104,11 +137,10 @@ router.get("/google/callback",loginuser);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: "Server error"
+ *                   example: "Internal Server Error"
  */
 
-router.post("/shorten",authMiddleware,createShortUrl);
-
+router.post("/shorten", authMiddleware, createShortUrl);
 
 /**
  * @swagger
@@ -120,7 +152,7 @@ router.post("/shorten",authMiddleware,createShortUrl);
  *       **Note:** Swagger UI does not follow redirects. Instead, it will return the redirect URL in JSON format.
  *       To test redirection, copy the URL from the response and open it in a browser.
  *     tags:
- *       - Redirect Short url 
+ *       - Redirect Short url
  *     parameters:
  *       - in: path
  *         name: alias
@@ -152,8 +184,7 @@ router.post("/shorten",authMiddleware,createShortUrl);
  *         description: Internal server error.
  */
 
-
-router.get("/shorten/:alias",redirectShortUrl);
+router.get("/shorten/:alias", redirectShortUrl);
 
 /**
  * @swagger
@@ -161,11 +192,13 @@ router.get("/shorten/:alias",redirectShortUrl);
  *   get:
  *     summary: Get overall analytics for all shortened URLs
  *     description: |
- *       Fetches analytics data for all shortened URLs, including total clicks, unique users, 
+ *       Fetches analytics data for all shortened URLs, including total clicks, unique users,
  *       OS and device type distribution, and click trends over the last 7 days.
  *       The response is cached in Redis for 1 hour.
  *     tags:
  *       - Analytics
+ *     security:
+ *       - TokenAuth: []
  *     responses:
  *       200:
  *         description: Successfully retrieved analytics data
@@ -229,6 +262,32 @@ router.get("/shorten/:alias",redirectShortUrl);
  *                       uniqueUsers:
  *                         type: integer
  *                         example: 400
+ *       401:
+ *         description: Unauthorized. The user is not authenticated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Not Authorized. Please log in again."
+ *       403:
+ *         description: Forbidden. Token not provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Token not provided."
  *       404:
  *         description: No URLs found
  *         content:
@@ -236,6 +295,9 @@ router.get("/shorten/:alias",redirectShortUrl);
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
  *                   example: "No URLs found"
@@ -246,19 +308,23 @@ router.get("/shorten/:alias",redirectShortUrl);
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
  *                   example: "Internal server error"
  */
 
-router.get("/analytics/overall",authMiddleware,getAllAnalytics);
+
+router.get("/analytics/overall", authMiddleware, getAllAnalytics);
 /**
  * @swagger
  * /api/analytics/{alias}:
  *   get:
  *     summary: Get analytics data for a specific short URL alias
  *     description: |
- *       Fetches analytics data for a specific short URL alias, including total clicks, 
+ *       Fetches analytics data for a specific short URL alias, including total clicks,
  *       unique users, OS and device type distribution, and click trends over the last 7 days.
  *       The response is cached in Redis for 1 hour.
  *     tags:
@@ -329,6 +395,32 @@ router.get("/analytics/overall",authMiddleware,getAllAnalytics);
  *                       uniqueUsers:
  *                         type: integer
  *                         example: 180
+  *       401:
+ *         description: Unauthorized. The user is not authenticated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Not Authorized. Please log in again."
+ *       403:
+ *         description: Forbidden. Token not provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Token not provided."
  *       404:
  *         description: No analytics found for this alias
  *         content:
@@ -351,7 +443,7 @@ router.get("/analytics/overall",authMiddleware,getAllAnalytics);
  *                   example: "Server Error"
  */
 
-router.get("/analytics/:alias",authMiddleware,getanalyticsByAlias);
+router.get("/analytics/:alias", authMiddleware, getanalyticsByAlias);
 
 /**
  * @swagger
@@ -416,12 +508,37 @@ router.get("/analytics/:alias",authMiddleware,getanalyticsByAlias);
  *                         type: integer
  *                         example: 120
  *                         description: Number of unique users who accessed this URL
-
+ *       401:
+ *         description: Unauthorized. The user is not authenticated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Not Authorized. Please log in again."
+ *       403:
+ *         description: Forbidden. Token not provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Token not provided."
  *       404:
  *         description: Topic not found
  *       500:
  *         description: Internal server error
  */
-router.get("/analytics/topic/:topic",authMiddleware,getanalyticsByTopic);
+router.get("/analytics/topic/:topic", authMiddleware, getanalyticsByTopic);
 
-module.exports=router;
+module.exports = router;
