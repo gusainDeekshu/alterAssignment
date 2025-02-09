@@ -63,7 +63,7 @@ const swaggerOptions = {
       version: "1.0.0",
       description: `API documentation for the URL tracking application  
       <br> <span style='color: red; font-weight: bold;'>Note:</span> For token, click 
-      <a href="${BASE_URL}/login/google" target="_blank"><code>/login/google</code></a> after the URL.`,
+      <a href="${BASE_URL}login/google" target="_blank"><code>/login/google</code></a> or add this after URL.`,
     },
     components: {
       securitySchemes: {

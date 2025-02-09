@@ -50,7 +50,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3001/auth/google/callback  # Ensure this ma
 REDIS_URL=redis://yoururl:port  # Leave empty if running Redis locally or via Docker
 MAX_REQUESTS=10
 TIME_WINDOW=60
-
+BASE_URL=http://localhost:3001
 Start the server:
 
 npm run server
