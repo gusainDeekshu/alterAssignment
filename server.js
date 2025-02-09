@@ -11,9 +11,7 @@ require("dotenv").config();
 const newLocal_1 = './routes/userroute';
 const userrouter=require(newLocal_1)
 const port=process.env.PORT || 3001;
-// const GOOGLE_REDIRECT_URI= "http://localhost:3001/auth/googleee";
-// console.log(process.env.GOOGLE_CLIENT_ID); // Debugging
-// console.log(process.env.JWT_SECRET);
+const BASE_URL = process.env.BASE_URL || "http://localhost:3001";
 
 
 
@@ -63,8 +61,9 @@ const swaggerOptions = {
     info: {
       title: "Short URL API",
       version: "1.0.0",
-      description: "API documentation for the URL tracking application  <br> <span style='color: red; font-weight: bold;'>Note:</span> For token, add <code>/login/google</code> after the URL.",
-
+      description: `API documentation for the URL tracking application  
+      <br> <span style='color: red; font-weight: bold;'>Note:</span> For token, click 
+      <a href="${BASE_URL}/login/google" target="_blank"><code>/login/google</code></a> after the URL.`,
     },
     components: {
       securitySchemes: {

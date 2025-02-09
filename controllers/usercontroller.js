@@ -273,11 +273,7 @@ const redirectShortUrl = async (req, res) => {
       return res.json({ redirectUrl: urlRecord.originalUrl });
     }
 
-    console.log(req.headers['accept'])
-    console.log(req.headers['accept'])
-    console.log(req.headers['accept'])
-    console.log(req.headers['accept'])
-    console.log(req.headers['accept'])
+    
     return res.redirect(302, urlRecord.originalUrl);
   } catch (error) {
     console.error("Error redirecting short URL:", error);
@@ -447,7 +443,7 @@ const getanalyticsByTopic = async (req, res) => {
 const getAllAnalytics = async (req, res) => {
   try {
     // Check if data is cached in Redis
-    console.log("Redis Client:", redisClient);
+   
     if (!redisClient) {
         throw new Error("Redis client is not initialized.");
     }
@@ -455,7 +451,7 @@ const getAllAnalytics = async (req, res) => {
 
     const cachedData = await redisClient.get(`analytics:all`);
     if (cachedData) {
-      console.log(cachedData);
+      
       return res.json(JSON.parse(cachedData));
     }
 
