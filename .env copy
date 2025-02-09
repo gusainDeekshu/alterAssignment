@@ -19,3 +19,4 @@ PORT=3001
 # REDIS_URL= 
 REDIS_URL=
 
+BASE_URL=http://localhost:3001
