@@ -3,8 +3,8 @@
 
 URL Shortener & Analytics 
 
-link:https://shortuurlweb.onrender.com/check
-documentation link:https://shortuurlweb.onrender.com/api-docs
+link:https://shorturl-production-ff53.up.railway.app/check
+documentation link:https://shorturl-production-ff53.up.railway.app/api-docs/
 
 Overview
 
@@ -89,7 +89,7 @@ Solution: Identified and filtered out traffic using User-Agent detection.
 
 Challenges Faced: Successfully deployed using ECR, ECS, and Load Balancing, but it cost $2 per day.
 
-Solution:Due to high costs, switched to Render for a more cost-effective solution.
+Solution:Due to high costs, switched to Railway(Free tire) for a more cost-effective solution.
 
 Future Improvements
 

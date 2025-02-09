@@ -1,0 +1,22 @@
+# Railway Project Configuration File
+
+[service]
+name = "shorturl"
+env = "production"
+start = "./run.sh"  # Start command (change if needed)
+healthcheck_path = "/health"  # Optional: Add a health check endpoint
+dockerfile = "Dockerfile"  # Ensure Railway uses your Dockerfile
+
+[deploy]
+restart_policy = "on-failure"  # Restart on failure
+max_retries = 3  # Retry limit
+
+[env]
+GOOGLE_CLIENT_ID = "your-google-client-id"
+GOOGLE_CLIENT_SECRET = "your-google-client-secret"
+GOOGLE_REDIRECT_URI = "http://your-railway-url.com/auth/google/callback"
+JWT_SECRET = "your-jwt-secret"
+MONGO_URI = "your-mongodb-uri"
+REDIS_HOST = "your-redis-host"
+REDIS_PORT = "your-redis-port"
+PORT = "3001"
