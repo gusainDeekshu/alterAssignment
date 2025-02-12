@@ -8,7 +8,7 @@ documentation link:https://shorturl-production-ff53.up.railway.app/api-docs/
 
 Overview
 
-This project is a URL shortener and analytics tool designed for tracking engagement on LinkedIn posts. It allows users to create short links and gather insights on their performance, including click tracking and user interactions. The backend is built using Node.js, with Google authentication implemented for secure access.
+This project is a URL shortener and analytics tool designed for tracking engagement on posts. It allows users to create short links and gather insights on their performance, including click tracking and user interactions. The backend is built using Node.js, with Google authentication implemented for secure access.
 
 Features
 
